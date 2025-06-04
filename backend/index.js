@@ -9,10 +9,11 @@ const app =express();
 app.get("/",(req,res)=>{
     res.send("This is noice")
 })
+const PORT = process.env.PORT || 5000
+app.use(express.json()) //This will help us to parse incoming json values...
+app.use("/api/auth",authRoutes);
 
-app.use("/api/auth",authRoutes)
-
-app.listen(3000,()=>{
+app.listen(PORT,()=>{
     connectDB();
-    console.log("Server is run at port 3000")
+    console.log(`Server is Connected at Port: ${PORT}`)
 })

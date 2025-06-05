@@ -1,8 +1,10 @@
 import { User } from "../models/user.model.js";
 import bcryptjs from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import {sendVerificationEmail} from "../mailtrap/emails.js"
 import {sendWelcomeEmail} from "../mailtrap/emails.js"
+import { sendPasswordResetEmail } from "../mailtrap/emails.js";
 
 const generateTokenAndSetCookie = (res, userId) => {
   const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -93,49 +95,73 @@ export const verifyEmail = async(req,res)=>{
   })
 }
 
-export const login = async (req, res) => {
-  const { email, password } = req.body;
+// export const login = async (req, res) => {
+//   const { email, password } = req.body;
 
+//   try {
+//     if (!email || !password) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Email and password are required!" });
+//     }
+
+//     const user = await User.findOne({ email });
+//     if (!user) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "User not found!" });
+//     }
+
+//     const isPasswordValid = await bcryptjs.compare(password, user.password);
+//     if (!isPasswordValid) {
+//       return res
+//         .status(401)
+//         .json({ success: false, message: "Invalid credentials!" });
+//     }
+
+//     generateTokenAndSetCookie(res, user._id);
+
+//     res
+//       .status(200)
+//       .json({
+//         success: true,
+//         message: "Login successful!",
+//         user: { ...user._doc, password: undefined },
+//       });
+//   } catch (error) {
+//     res
+//       .status(500)
+//       .json({
+//         success: false,
+//         message: error.message || "Internal Server Error",
+//       });
+//   }
+// };
+
+export const login=async(req,res)=>{
+  const {email,password}=req.body;
   try {
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email and password are required!" });
+    const user = await User.findOne({email});
+    if(!user){
+      return res.status(400).json({message:"Invalid Credentials!"});
     }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found!" });
+    const isPasswordValid=await bcryptjs.compare(password,user.password);
+    if(!isPasswordValid){
+      return res.status(400).json({success:false,message:"Invalid Credentials!"})
     }
-
-    const isPasswordValid = await bcryptjs.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid credentials!" });
-    }
-
-    generateTokenAndSetCookie(res, user._id);
-
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Login successful!",
-        user: { ...user._doc, password: undefined },
-      });
+    res.status(200).json({
+      success:true,
+      message:"Logged in Successfully!",
+      user:{
+        ...user._doc,
+        password:undefined
+      },
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: error.message || "Internal Server Error",
-      });
+    console.log("Error in logging in!",error);
+    return res.status(500).json({success:false,message:error.message});
   }
-};
-
+}
 export const logout = async (req, res) => {
   try {
     res.cookie("jwt", "", { maxAge: 0 });
@@ -144,3 +170,37 @@ export const logout = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+export const forgetpassword = async(req,res)=>{
+    const {email} = req.body;
+  try{
+    const user = await User.findOne({ email });
+      if(!user){
+        return res.status(400).json({message:"Invalid Credentials!",success:false});
+      }
+      //Generate Token
+      const resetToken = crypto.randomBytes(20).toString("hex");
+      const resetTokenExpiresAt = Date.now() + 1 * 60 * 60 * 1000; // 1 hour
+
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordExpiresAt = resetTokenExpiresAt;
+
+      await user.save();
+      await sendPasswordResetEmail(
+        user.email,
+        `${process.env.CLIENT_URL}/reset-password/${resetToken}`
+      );
+
+      res
+        .status(200)
+        .json({
+          success: true,
+          message: "Password reset link sent to your email",
+        });
+
+  }catch(error){
+    console.log("Error in forgetpassword!!");
+    return res.status(400).json({success:false,message:"Forget Password Failed!"});
+  }
+}

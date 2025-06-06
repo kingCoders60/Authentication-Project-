@@ -30,7 +30,7 @@ This project is a **secure authentication system** built using the **MERN (Mongo
 ## 🛠 **Installation & Setup**
 ### **1️⃣ Clone the Repository**
 ```sh
-git clone https://github.com/your-repo/backend-auth-mern.git
+git clone https://github.com/kingCoders60/Authentication-Project-/tree/main.git
 cd backend-auth-mern
 ```
 

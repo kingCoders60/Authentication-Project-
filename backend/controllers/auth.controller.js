@@ -4,7 +4,10 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import {sendVerificationEmail} from "../mailtrap/emails.js"
 import {sendWelcomeEmail} from "../mailtrap/emails.js"
-import { sendPasswordResetEmail } from "../mailtrap/emails.js";
+import {
+  sendPasswordResetEmail,
+  sendResetSuccessfullEmail,
+} from "../mailtrap/emails.js";
 
 const generateTokenAndSetCookie = (res, userId) => {
   const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -172,7 +175,7 @@ export const logout = async (req, res) => {
 };
 
 
-export const forgetpassword = async(req,res)=>{
+export const forgetPassword = async(req,res)=>{
     const {email} = req.body;
   try{
     const user = await User.findOne({ email });
@@ -202,5 +205,50 @@ export const forgetpassword = async(req,res)=>{
   }catch(error){
     console.log("Error in forgetpassword!!");
     return res.status(400).json({success:false,message:"Forget Password Failed!"});
+  }
+}
+
+export const resetPassword = async(req,res)=>{
+  try {
+    const {token} = req.params;
+    const {password}=req.body;
+
+    const user = await User.findOne({
+      resetPasswordToken:token,
+      resetPasswordExpiresAt:{ $gt:Date.now()},
+    });
+
+    if(!user){
+      return res.status(400).json({
+        success:false,
+        message:"Invalid or Token Expired!!"
+      })
+    }
+      const hashedPassword=await bcryptjs.hash(password,10);
+      user.password=hashedPassword,
+      user.resetPasswordToken=undefined,
+      user.resetPasswordExpiresAt=undefined,
+      await user.save();
+
+      await sendResetSuccessfullEmail(user.email);
+      return res.status(200).json({success:true,message:"Password reset successfully!!"});
+    
+  } catch (error) {
+    return res.status(500).json({sucess:false,message:"Error in resetting the password!"});
+  }
+}
+
+export const checkAuth=async(req,res)=>{
+  try {
+    const user= await User.findById(req.userId);
+    if(!user){
+      return res.status(400).json({sucess:false,message:"User not Found!!"});
+    }
+    res.status(200).json({success:true,user:{
+      ...user._doc,
+      password:undefined
+    }});
+  } catch (error) {
+    
   }
 }
